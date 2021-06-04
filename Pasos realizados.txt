@@ -1,0 +1,104 @@
+Para setear las ips estaticas en las virtuales modifique el archivo "/etc/network/interfaces", luego reinicie el servicio de NetworkManager (ej. sudo systemctl restart NetworkManager o network.service)
+
+Web-server:
+-----------
+
+Para descargar el jdk use wget. (?AuthParam=123123) entre 2 maquinas virtuales
+Me transferi los archivos via "scp":
+sudo scp [nombre-maquina]@[IP]:Descargas/jdk-xxx.tar.gz /opt/
+sudo tar -xvf jdk.xxx.tar.gz -C /opt/
+
+Para la instalacion de Apache Tomcat descargue el comprimido desde cliente-dmz para luego transferirlo via scp a web-server. Luego descomprimi el archivo en /opt/
+sudo tar -xvf apache-tomcat-xxx.tar.gz /opt/
+
+Para descargar sample.war utilice:
+wget https://tomcat.apache.org/tomcat-7.0-doc/appdev/sample/sample.war
+
+Configuracion de .bashrc:
+-------------------------
+
+JAVA_HOME=/opt/jdk-16.0.1
+export PATH=$PATH:$JAVA_HOME/bin
+
+Tuve que crear un script y exportar JAVA_HOME para que el script "startup.sh" funcione: 
+./setenv.sh
+
+
+Segui las instrucciones de esta web:
+https://www.digitalocean.com/community/tutorials/how-to-install-apache-tomcat-9-on-debian-10
+
+- Hice creacion de usuario y grupo tomcat
+- Levante un servicio para tomcat y configure las epsecificaciones acorde a mi entorno.
+
+
+Firewall:
+---------
+
+Para esto tuve que configurar 3 interfaces desde virtualbox. (eth0, eth1, eth0)
+Para poder tener acceso a internet deje la interfaz eth0 por defecto.
+
+a) Al cargar la configuracion de iptables al inicio no solo hago un iptables-restore, sino que tambien hago la siguiente configuracion:
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+b) Politicas DROP
+sudo iptables -P INPUT DROP
+sudo iptables -P FORWARD DROP
+sudo iptables -P OUTPUT DROP
+
+c) Conexion loopback
+sudo iptables -A INPUT -j ACCEPT -i lo
+sudo iptables -A OUTPUT -j ACCEPT -o lo
+
+d) La VM cliente-02 puede administrar el firewall via ssh
+sudo iptables -A INPUT -p tcp -s 192.168.20.2 --dport 22 -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+sudo iptables -A OUTPUT -p tcp --sport 22 -m conntrack --ctstate ESTABLISHED -j ACCEPT
+
+e) La VM cliente-03 puede navegar por internet
+sudo iptables -A FORWARD -s 192.168.20.3 -i eth2 -o eth0 -j ACCEPT
+sudo iptables -A FORWARD -i eth0 -o eth2 -j ACCEPT -m state --state ESTABLISHED,RELATED
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+f) La VM cliente-04 puede ingresar al web-server
+- Para aceptar la conexion de cliente-04:
+sudo iptables -A FORWARD -s 192.168.20.4 -i eth2 -o eth1 -j ACCEPT
+- Para forwardear la comunicacion ya establecida desde el web-server a cliente-04
+sudo iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT -m state --state ESTABLISHED,RELATED
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+DHCP-SERVER:
+-----------
+
+Siguiendo las instrucciones de instalacion "isc-dhcp-server" tuve que configurar los archivos:
+/etc/default/isc-dhcp-server
+/etc/dhcp/dhcpd.conf
+Luego reinicio el servicio: 
+/etc/init.d/isc-dhcp-server restart
+
+Para que la maquina 5 y 6 tomen direcciones de mi servidor dhcp solo tuve que instalar el cliente dhcp:
+aptitude install isc-dhcp-client
+Luego reinicio el servicio:
+sudo systemctl restart NetworkManager
+
+
+File-server:
+------------
+
+Tuve que instalar el programa rsync:
+- Genere claves publicas de ssh para la maquina 3 y el file-server, la idea es que pueda realizar backups sin la necesidad de escribir la contraseña.
+- En la instalacion de la VM tambien implemente LVM, pero no sobre el disco de backup /dev/sdb.
+- Para configurar LVM en en otra particion primero tuve que agregar un disco aparte /dev/sdb.
+Pasos:
+sudo fdisk /dev/sdb
+sudo pvcreate /dev/sdb1
+sudo vgcreate vg_backup_server /dev/sdb1
+sudo lvcreate -L 100M -n lv_backup_server vg_backup_server
+sudo mkfs.ext4 /dev/vg_backup_server/lv_backup_server
+
+Luego tuve que modificar el archivo /etc/fstab para que al iniciar se pueda montar la particion en el directorio /media/disco_backups (previamente creado):
+/dev/vg_backup_server/lv_backup_server   /media/disco_backups    ext4    defaults     0     0
+
+Tambien se podia hacer manual: 
+mount /media/disco_backups
+
+Para extender un volumen: vgextend "nombre de grupo" "particion"
+Para extender volumen logico: lvextend -L "+1GB" "ruta logica volumen"
