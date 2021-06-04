@@ -1,35 +1,5 @@
 Para setear las ips estaticas en las virtuales modifique el archivo "/etc/network/interfaces", luego reinicie el servicio de NetworkManager (ej. sudo systemctl restart NetworkManager o network.service)
 
-Web-server:
------------
-
-Para descargar el jdk use wget. (?AuthParam=123123) entre 2 maquinas virtuales
-Me transferi los archivos via "scp":
-sudo scp [nombre-maquina]@[IP]:Descargas/jdk-xxx.tar.gz /opt/
-sudo tar -xvf jdk.xxx.tar.gz -C /opt/
-
-Para la instalacion de Apache Tomcat descargue el comprimido desde cliente-dmz para luego transferirlo via scp a web-server. Luego descomprimi el archivo en /opt/
-sudo tar -xvf apache-tomcat-xxx.tar.gz /opt/
-
-Para descargar sample.war utilice:
-wget https://tomcat.apache.org/tomcat-7.0-doc/appdev/sample/sample.war
-
-Configuracion de .bashrc:
--------------------------
-
-JAVA_HOME=/opt/jdk-16.0.1
-export PATH=$PATH:$JAVA_HOME/bin
-
-Tuve que crear un script y exportar JAVA_HOME para que el script "startup.sh" funcione: 
-./setenv.sh
-
-
-Segui las instrucciones de esta web:
-https://www.digitalocean.com/community/tutorials/how-to-install-apache-tomcat-9-on-debian-10
-
-- Hice creacion de usuario y grupo tomcat
-- Levante un servicio para tomcat y configure las epsecificaciones acorde a mi entorno.
-
 
 Firewall:
 ---------
@@ -64,6 +34,39 @@ sudo iptables -A FORWARD -s 192.168.20.4 -i eth2 -o eth1 -j ACCEPT
 - Para forwardear la comunicacion ya establecida desde el web-server a cliente-04
 sudo iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT -m state --state ESTABLISHED,RELATED
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+
+Web-server:
+-----------
+
+Para descargar el jdk use wget [URL].
+Me transferi los archivos via "scp":
+sudo scp [nombre-maquina]@[IP]:Descargas/jdk-xxx.tar.gz /opt/
+sudo tar -xvf jdk.xxx.tar.gz -C /opt/
+
+Para la instalacion de Apache Tomcat descargue el comprimido desde cliente-dmz para luego transferirlo via scp a web-server. Luego descomprimi el archivo en /opt/
+sudo tar -xvf apache-tomcat-xxx.tar.gz /opt/
+
+Para descargar sample.war utilice:
+wget https://tomcat.apache.org/tomcat-7.0-doc/appdev/sample/sample.war
+
+Configuracion de .bashrc:
+-------------------------
+
+JAVA_HOME=/opt/jdk-16.0.1
+export PATH=$PATH:$JAVA_HOME/bin
+
+Tuve que crear un script y exportar JAVA_HOME para que el script "startup.sh" funcione: 
+./setenv.sh
+
+
+Segui las instrucciones de esta web:
+https://www.digitalocean.com/community/tutorials/how-to-install-apache-tomcat-9-on-debian-10
+
+- Hice creacion de usuario y grupo tomcat
+- Levante un servicio para tomcat y configure las epsecificaciones acorde a mi entorno.
+
+
 
 DHCP-SERVER:
 -----------
